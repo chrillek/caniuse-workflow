@@ -1,0 +1,318 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>bundleid</key>
+	<string>de.bru6</string>
+	<key>category</key>
+	<string>Internet</string>
+	<key>connections</key>
+	<dict>
+		<key>4E81152C-9E00-45FC-9C42-D99B3D80D3E3</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>ABF404AE-7171-4B13-9FF0-A3FAF5CB4DD4</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>ABF404AE-7171-4B13-9FF0-A3FAF5CB4DD4</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>86A62DE8-DE53-4368-88F0-0052B79F40E5</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+	</dict>
+	<key>createdby</key>
+	<string>Christian Kirsch</string>
+	<key>description</key>
+	<string>Find terms on caniuse.com, using the site's exported data</string>
+	<key>disabled</key>
+	<false/>
+	<key>name</key>
+	<string>Search Caniuse.com</string>
+	<key>objects</key>
+	<array>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>action</key>
+				<integer>0</integer>
+				<key>argument</key>
+				<integer>0</integer>
+				<key>focusedappvariable</key>
+				<false/>
+				<key>focusedappvariablename</key>
+				<string></string>
+				<key>hotkey</key>
+				<integer>8</integer>
+				<key>hotmod</key>
+				<integer>1966080</integer>
+				<key>hotstring</key>
+				<string>C</string>
+				<key>leftcursor</key>
+				<false/>
+				<key>modsmode</key>
+				<integer>0</integer>
+				<key>relatedAppsMode</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.trigger.hotkey</string>
+			<key>uid</key>
+			<string>4E81152C-9E00-45FC-9C42-D99B3D80D3E3</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>alfredfiltersresults</key>
+				<false/>
+				<key>alfredfiltersresultsmatchmode</key>
+				<integer>0</integer>
+				<key>argumenttreatemptyqueryasnil</key>
+				<true/>
+				<key>argumenttrimmode</key>
+				<integer>0</integer>
+				<key>argumenttype</key>
+				<integer>0</integer>
+				<key>escaping</key>
+				<integer>68</integer>
+				<key>keyword</key>
+				<string>cu</string>
+				<key>queuedelaycustom</key>
+				<integer>3</integer>
+				<key>queuedelayimmediatelyinitially</key>
+				<true/>
+				<key>queuedelaymode</key>
+				<integer>0</integer>
+				<key>queuemode</key>
+				<integer>1</integer>
+				<key>runningsubtext</key>
+				<string></string>
+				<key>script</key>
+				<string>ObjC.import("Foundation");
+const dataURL='https://raw.githubusercontent.com/Fyrd/caniuse/main/fulldata-json/data-2.0.json';
+
+function findMatches(query, data) {
+  const lcQuery = query.toLowerCase();
+  return data.filter(d =&gt; {
+    console.log('${lcQuery}: ${d.title}/${d.name)/[${d.keywords}]')
+    return d.title.toLowerCase().includes(lcQuery) || 
+    d.name.toLowerCase().includes(lcQuery)  ||
+    d.keywords.toLowerCase().includes(lcQuery) ;
+  });
+} /* findMatches() */
+
+function getBrowserVersion(stats, title, browser) {
+  let version = 0;
+  let retval = '';
+  
+  for (const v of Object.keys(stats).sort((a,b) =&gt; Number(a) - Number(b))) {
+    const numVersion = Number(v);
+    const support = stats[v];
+  //  if (title.indexOf('WOFF 2')&gt; -1) console.log(`${browser}: ${numVersion} ${support}`);
+    if (numVersion &gt; version) {
+      if (support === 'y') {
+        retval = `${v}+`;
+        break;
+      }
+      if (support.indexOf('y x') &gt; -1) {
+        version = numVersion;
+        retval = `${v}-px-`;
+      } else if (support.indexOf('a') &gt; -1) {
+        version = numVersion;
+        retval = `${v}!pa.`;
+      } else if (support.indexOf('p') &gt; -1) {
+        version = numVersion;
+        retval = `${v}w/pl`;
+      }
+    }
+  }
+//  if (title.indexOf('WOFF 2')&gt; -1) console.log(`Version ${browser} found: ${retval}`);
+  return retval;
+} /* getBrowserVersion */
+
+function run(argv) {
+  const browserMap = {'ie': 'IE',
+    'edge'   : 'E',
+    'firefox': 'FF',
+    'chrome' : 'GC',
+    'safari' : 'S'};
+  
+  const query = argv[0];
+  if (!query) return;
+  const localCache = 'data.json';
+  const filemanager = $.NSFileManager.defaultManager;
+  const modificationDate = (() =&gt; {
+    if (filemanager.fileExistsAtPath($(localCache))) {
+      const error = Ref();
+      const dict = filemanager.attributesOfItemAtPathError($(localCache), error);
+      return dict.objectForKey($.NSFileModificationDate).js;
+    } else {
+      return null;
+    }
+  })()
+  //   console.log(modificationDate);
+  const milliSecsPerDay = 8.64e7;
+  const cachedValues = (() =&gt; {
+    const app = Application.currentApplication();
+    app.includeStandardAdditions = true;
+    
+    if (!modificationDate || (Date.now() - modificationDate) &gt;= (milliSecsPerDay * 7)) {
+    //  const dataURL = 'https://raw.githubusercontent.com/Fyrd/caniuse/master/data.json'; 
+      const dataJSON = app.doShellScript(`curl ${dataURL}`);
+  //    console.log(dataJSON.length);
+      const data = JSON.parse(dataJSON).data;
+      const cacheArray = Object.keys(data).map(k =&gt; {
+        const caniuseData = data[k];
+//        console.log(Object.keys(caniuseData.stats).filter(b =&gt; browserMap[b]));
+  //      console.log(Object.keys(caniuseData.stats));
+        const stats = {};
+        Object.keys(caniuseData.stats).filter(browser =&gt; browserMap[browser]).forEach(browser =&gt; {
+          const support = getBrowserVersion(caniuseData.stats[browser], caniuseData.title, browser);
+          if (support.trim().length) stats[browserMap[browser]] = support;
+        })
+        return {
+          name:   k,
+          title:  caniuseData.title,
+          url:    `https://caniuse.com/#feat=${k}`,
+          description: caniuseData.description,
+          keywords: caniuseData.keywords,
+          stats: Object.keys(stats).map(key =&gt; `${key}: ${stats[key]}`).join(', '),
+        }
+      });
+      if (cacheArray.length) {
+        /* write cache data */
+        //      console.log(`updating cache data @ ${Path(localCache)}`);
+        const file = app.openForAccess(Path(localCache), {writePermission: true});
+        app.write(JSON.stringify(cacheArray), {to: file});
+        app.closeAccess(file);
+      }
+      return cacheArray;
+    } /* if local file is older than one week */ else {
+      const file = app.openForAccess(Path(localCache));
+      const cacheArray = JSON.parse(app.read(file));
+      app.closeAccess(file);
+      return cacheArray;
+    }
+  })()
+  /* Now 'cachedValues' contains the relevant JSON data */
+  const result = findMatches(query, cachedValues);
+  const items = result.map(r =&gt; {
+    return {
+      uid: r.title,
+      arg: r.url,
+      title: `${r.title} [${r.stats}]`, 
+      subtitle: r.description,
+      icon: { path: 'icon.png'},
+      /* add icon */
+    }
+  }); /* items */
+  return JSON.stringify({items: (items.length ? 
+    items : 
+    [{ title: `No matches found for ${query}`}]) });
+}</string>
+				<key>scriptargtype</key>
+				<integer>1</integer>
+				<key>scriptfile</key>
+				<string></string>
+				<key>subtext</key>
+				<string>Search Caniuse for {{query}}</string>
+				<key>title</key>
+				<string>Search Caniuse</string>
+				<key>type</key>
+				<integer>7</integer>
+				<key>withspace</key>
+				<true/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.input.scriptfilter</string>
+			<key>uid</key>
+			<string>ABF404AE-7171-4B13-9FF0-A3FAF5CB4DD4</string>
+			<key>version</key>
+			<integer>3</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>browser</key>
+				<string></string>
+				<key>skipqueryencode</key>
+				<false/>
+				<key>skipvarencode</key>
+				<false/>
+				<key>spaces</key>
+				<string></string>
+				<key>url</key>
+				<string>{query}</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.action.openurl</string>
+			<key>uid</key>
+			<string>86A62DE8-DE53-4368-88F0-0052B79F40E5</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+	</array>
+	<key>readme</key>
+	<string>Simple search for terms in the data of caniuse.com. Does not require third party software like PHP or Python.
+
+It uses the official exported JSON file on Github
+https://raw.githubusercontent.com/Fyrd/caniuse/main/fulldata-json/data-2.0.json
+for this.
+Terms are looked for in the title, keywords and the JSON data's key.
+
+**Note 1**: The file is updated whenever the local copy is older than a week. 
+**Note 2**: The data is _not_ complete, i.e. it is not the same as on caniuse.com. It's not clear yet why the exported data does not contain all the information from the website. 
+
+Keyboard shortcut is Ctrl-Opt-Cmd C, trigger is 'cu'. Both can be modified, of course.
+
+The code is modelled after an earlier version by Will Farrell (https://github.com/willfarrell/alfred-caniuse-workflow). This workflow relied on PHP.</string>
+	<key>uidata</key>
+	<dict>
+		<key>4E81152C-9E00-45FC-9C42-D99B3D80D3E3</key>
+		<dict>
+			<key>xpos</key>
+			<real>60</real>
+			<key>ypos</key>
+			<real>40</real>
+		</dict>
+		<key>86A62DE8-DE53-4368-88F0-0052B79F40E5</key>
+		<dict>
+			<key>xpos</key>
+			<real>640</real>
+			<key>ypos</key>
+			<real>40</real>
+		</dict>
+		<key>ABF404AE-7171-4B13-9FF0-A3FAF5CB4DD4</key>
+		<dict>
+			<key>xpos</key>
+			<real>330</real>
+			<key>ypos</key>
+			<real>40</real>
+		</dict>
+	</dict>
+	<key>userconfigurationconfig</key>
+	<array/>
+	<key>variablesdontexport</key>
+	<array/>
+	<key>version</key>
+	<string>1.0</string>
+	<key>webaddress</key>
+	<string></string>
+</dict>
+</plist>
